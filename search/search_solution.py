@@ -1,6 +1,7 @@
 import pickle, os, time, gdown
 import numpy as np
 import hnswlib
+from copy import copy
 
 from tqdm import tqdm
 from typing import List, Tuple
@@ -17,8 +18,8 @@ class SearchSolution(Base):
     search 
     '''
     # @profile
-    def __init__(self, data_file='./data/hnsw_0.bin',
-                 data_url='https://drive.google.com/file/d/1VTySmcrs-FnuE8lPVAShD4S5qJ_MmJTm/view?usp=sharing') -> None:
+    def __init__(self, data_file='./data/list_hnsw.bin',
+                 data_url="https://drive.google.com/u/1/uc?id=1-04UmEZH_MZu92nNmeiYA4KisnZwoqJr&export=download") -> None:
         '''
         Creates regestration matrix and passes 
         dictionary. Measures baseline speed on
@@ -28,13 +29,13 @@ class SearchSolution(Base):
         self.data_file = data_file
         self.data_url = data_url
 
-        dim = 512
-        max_elements = 2000001
-        ef_construction = 200
-        M = 16
+        self.dim = 512
+        self.part_step = 10000
+        self.max_elements = 11000
+        self.ef_construction = 200
+        self.M = 16
 
-        self.index = hnswlib.Index(space='cosine', dim=dim)  # possible options are l2, cosine or ip
-        self.index.init_index(max_elements=max_elements, ef_construction=ef_construction, M=M)
+        self.reg_matrix = []
 
     # @profile
     def set_base_from_pickle(self):
@@ -46,8 +47,8 @@ class SearchSolution(Base):
         pass_dict : dict -> dict[idx] = [np.array[1, 512]]
         '''
         base_file = './data/train_data.pickle'
-        base_url = 'https://drive.google.com/uc?id=1D_jPx7uIaCJiPb3pkxcrkbeFcEogdg2R'
-
+        base_url = "https://drive.google.com/u/1/uc?id=1NfZwLjy0rQ_vGB_nKXjYIu1vm5tgErEg&export=download"
+        ""
         if not os.path.isfile(self.data_file):
             if not os.path.isdir('./data'):
                 os.mkdir('./data') 
@@ -62,10 +63,8 @@ class SearchSolution(Base):
             data = pickle.load(f)
         self.pass_dict = data['pass']
 
-        self.index.load_index(self.data_file)
-        self.ids = {}
-        for i in range(self.index.get_current_count()):
-            self.ids[i] = i
+        with open(self.data_file, 'rb') as f:
+            self.reg_matrix = pickle.load(f)
 
     # @profile
     def cal_base_speed(self, base_speed_path='./base_speed.pickle') -> float:
@@ -96,8 +95,8 @@ class SearchSolution(Base):
                 break
 
         base_speed = T_base / N
-        print(f"Base Line Speed: {base_speed}")
-        print(f"Base Line Accuracy: {C / N * 100}")
+        print(f"Solution Line Speed: {base_speed}")
+        print(f"Solution Line Accuracy: {C / N * 100}")
         with open(base_speed_path, 'wb') as f:
             pickle.dump(base_speed, f)
 
@@ -113,9 +112,20 @@ class SearchSolution(Base):
         Return:
             List[Tuple] - indicies of search, similarity
         '''
-        labels, distances = self.index.knn_query(query, k=10)
-        distances = 1 - distances
-        return [(self.ids[i], sim) for i, sim in zip(labels[0].tolist(), distances[0].tolist())]
+        all_distances = []
+        all_labels = []
+        for graph_idx, graph_hnws in enumerate(self.reg_matrix):
+            # print(graph_idx, graph_hnws.get_current_count())
+            if graph_hnws.get_current_count() < 5:
+                continue
+            labels, distances = graph_hnws.knn_query(query, k=5)
+            labels = labels + graph_idx * self.part_step
+            distances = 1 - distances
+            all_labels += labels[0].tolist()
+            all_distances += distances[0].tolist()
+
+        result = sorted(list(zip(all_labels, all_distances)), key=lambda x: x[1], reverse=True)[:10]
+        return result
 
     def insert_base(self, feature: np.array) -> None:
         ## there no inplace concationation in numpy so far. For inplace
@@ -123,7 +133,14 @@ class SearchSolution(Base):
         ## memory. For now, let us suffice the naive implementation of insertion
         # self.reg_matrix = np.concatenate(self.reg_matrix, feature, axis=0)
         # pass
-        self.index.add_items(feature)
+        graph_hnws = self.reg_matrix[-1]
+        if graph_hnws.get_current_count() >= self.part_step:
+            p = hnswlib.Index(space='cosine', dim=self.dim)  # possible options are l2, cosine or ip
+            p.init_index(max_elements=self.max_elements, ef_construction=self.ef_construction, M=self.M)
+            p.add_items(feature)
+            self.reg_matrix.append(copy(p))
+        else:
+            graph_hnws.add_items(feature)
 
     def cos_sim(self, query: np.array) -> np.array:
         pass
