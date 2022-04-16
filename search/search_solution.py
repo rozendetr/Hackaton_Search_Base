@@ -24,6 +24,7 @@ class SearchSolution(Base):
         dictionary. Measures baseline speed on
         a given machine
         '''
+        print('reading from Solutions')
         self.data_file = data_file
         self.data_url = data_url
 
@@ -51,6 +52,10 @@ class SearchSolution(Base):
             if not os.path.isdir('./data'):
                 os.mkdir('./data') 
             gdown.download(self.data_url, self.data_file, quiet=False)
+
+        if not os.path.isfile(base_file):
+            if not os.path.isdir('./data'):
+                os.mkdir('./data')
             gdown.download(base_url, base_file, quiet=False)
 
         with open(base_file, 'rb') as f:
@@ -117,7 +122,9 @@ class SearchSolution(Base):
         ## concationation operation both array should be contingious in 
         ## memory. For now, let us suffice the naive implementation of insertion
         # self.reg_matrix = np.concatenate(self.reg_matrix, feature, axis=0)
-        pass
+        # pass
+        self.index.add_items(feature)
 
-    # def cos_sim(self, query: np.array) -> np.array:
-    #     return np.dot(self.reg_matrix, query)
+
+    def cos_sim(self, query: np.array) -> np.array:
+        return np.dot(self.reg_matrix, query)
