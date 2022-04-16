@@ -19,7 +19,7 @@ class SearchSolution(Base):
     '''
     # @profile
     def __init__(self, data_file='./data/hnsw_0.bin',
-                 data_url='https://drive.google.com/file/d/1VTySmcrs-FnuE8lPVAShD4S5qJ_MmJTm/view?usp=sharing') -> None:
+                 data_url="https://drive.google.com/u/1/uc?id=1VTySmcrs-FnuE8lPVAShD4S5qJ_MmJTm&export=download") -> None:
         '''
         Creates regestration matrix and passes 
         dictionary. Measures baseline speed on
@@ -47,8 +47,8 @@ class SearchSolution(Base):
         pass_dict : dict -> dict[idx] = [np.array[1, 512]]
         '''
         base_file = './data/train_data.pickle'
-        base_url = 'https://drive.google.com/file/d/1NfZwLjy0rQ_vGB_nKXjYIu1vm5tgErEg/view?usp=sharing'
-
+        base_url = "https://drive.google.com/u/1/uc?id=1NfZwLjy0rQ_vGB_nKXjYIu1vm5tgErEg&export=download"
+        ""
         if not os.path.isfile(self.data_file):
             if not os.path.isdir('./data'):
                 os.mkdir('./data') 
@@ -59,9 +59,9 @@ class SearchSolution(Base):
                 os.mkdir('./data')
             gdown.download(base_url, base_file, quiet=False)
 
-        # with open(base_file, 'rb') as f:
-        #     data = pickle.load(f)
-        # self.pass_dict = data['pass']
+        with open(base_file, 'rb') as f:
+            data = pickle.load(f)
+        self.pass_dict = data['pass']
 
         self.index.load_index(self.data_file)
         self.ids = {}
