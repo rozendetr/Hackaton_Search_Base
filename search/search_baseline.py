@@ -101,14 +101,13 @@ class SearchBase(Base):
         '''
         similarity = self.cos_sim(query) 
         return [(self.ids[i], sim) for i, sim in enumerate(similarity)] 
-    
 
     def insert_base(self, feature: np.array) -> None:
-
         ## there no inplace concationation in numpy so far. For inplace
         ## concationation operation both array should be contingious in 
         ## memory. For now, let us suffice the naive implementation of insertion
-        self.reg_matrix = np.concatenate(self.reg_matrix, feature, axis=0) 
+        # self.reg_matrix = np.concatenate(self.reg_matrix, feature, axis=0)
+        pass
 
     def cos_sim(self, query: np.array) -> np.array:
         return np.dot(self.reg_matrix, query)
