@@ -18,10 +18,10 @@ class SearchSolution(Base):
     search 
     '''
     # @profile
-    def __init__(self, data_file='./data/hnsw_0.bin',
-                 data_url="https://drive.google.com/u/1/uc?id=1VTySmcrs-FnuE8lPVAShD4S5qJ_MmJTm&export=download") -> None:
+    def __init__(self, data_file='./data/list_hnsw.bin',
+                 data_url="https://drive.google.com/u/1/uc?id=1-04UmEZH_MZu92nNmeiYA4KisnZwoqJr&export=download") -> None:
         '''
-        Creates regestration matrix and passes 
+        Creates regestration matrix and passes
         dictionary. Measures baseline speed on
         a given machine
         '''
@@ -29,13 +29,13 @@ class SearchSolution(Base):
         self.data_file = data_file
         self.data_url = data_url
 
-        dim = 512
-        max_elements = 2000001
-        ef_construction = 200
-        M = 16
+        self.dim = 512
+        self.part_step = 10000
+        self.max_elements = 11000
+        self.ef_construction = 200
+        self.M = 16
 
-        self.index = hnswlib.Index(space='cosine', dim=dim)  # possible options are l2, cosine or ip
-        self.index.init_index(max_elements=max_elements, ef_construction=ef_construction, M=M)
+        self.reg_matrix = []
 
     # @profile
     def set_base_from_pickle(self):
@@ -51,7 +51,7 @@ class SearchSolution(Base):
         ""
         if not os.path.isfile(self.data_file):
             if not os.path.isdir('./data'):
-                os.mkdir('./data') 
+                os.mkdir('./data')
             gdown.download(self.data_url, self.data_file, quiet=False)
 
         if not os.path.isfile(base_file):
@@ -63,10 +63,8 @@ class SearchSolution(Base):
             data = pickle.load(f)
         self.pass_dict = data['pass']
 
-        self.index.load_index(self.data_file)
-        self.ids = {}
-        for i in range(self.index.get_current_count()):
-            self.ids[i] = i
+        with open(self.data_file, 'rb') as f:
+            self.reg_matrix = pickle.load(f)
 
     # @profile
     def cal_base_speed(self, base_speed_path='./base_speed.pickle') -> float:
@@ -74,23 +72,23 @@ class SearchSolution(Base):
         Validates baseline and improved searh
         Return:
                 metric : float - score for search
-        ''' 
+        '''
 
-        samples = cfg.samples 
+        samples = cfg.samples
         N, C, C_time, T_base = 0, 0, 0, 0
         for i, tup in enumerate(tqdm(self.pass_dict.items(), total=samples)):
 
             idx, passes = tup
             for q  in passes:
                 t0 = time.time()
-                c_output = self.search(query=q) 
+                c_output = self.search(query=q)
                 t1 = time.time()
                 T_base += (t1 - t0)
 
                 C_set = [True for tup in c_output if tup[0] == idx]
                 if len(C_set):
                     C += 1
-                    C_time += (t1 - t0) 
+                    C_time += (t1 - t0)
                 N += 1
 
             if i > samples:
@@ -105,7 +103,7 @@ class SearchSolution(Base):
     # @profile
     def search(self, query: np.array) -> List[Tuple]:
         '''
-        Baseline search algorithm. 
+        Baseline search algorithm.
         Uses simple matrix multiplication
         on normalized feature of face images
 
@@ -114,17 +112,35 @@ class SearchSolution(Base):
         Return:
             List[Tuple] - indicies of search, similarity
         '''
-        labels, distances = self.index.knn_query(query, k=10)
-        distances = 1 - distances
-        return [(self.ids[i], sim) for i, sim in zip(labels[0].tolist(), distances[0].tolist())]
+        all_distances = []
+        all_labels = []
+        for graph_idx, graph_hnws in enumerate(self.reg_matrix):
+            # print(graph_idx, graph_hnws.get_current_count())
+            if graph_hnws.get_current_count() < 5:
+                continue
+            labels, distances = graph_hnws.knn_query(query, k=5)
+            labels = labels + graph_idx * self.part_step
+            distances = 1 - distances
+            all_labels += labels[0].tolist()
+            all_distances += distances[0].tolist()
+
+        result = sorted(list(zip(all_labels, all_distances)), key=lambda x: x[1], reverse=True)[:10]
+        return result
 
     def insert_base(self, feature: np.array) -> None:
         ## there no inplace concationation in numpy so far. For inplace
-        ## concationation operation both array should be contingious in 
+        ## concationation operation both array should be contingious in
         ## memory. For now, let us suffice the naive implementation of insertion
         # self.reg_matrix = np.concatenate(self.reg_matrix, feature, axis=0)
         # pass
-        self.index.add_items(feature)
+        graph_hnws = self.reg_matrix[-1]
+        if graph_hnws.get_current_count() >= self.part_step:
+            p = hnswlib.Index(space='cosine', dim=self.dim)  # possible options are l2, cosine or ip
+            p.init_index(max_elements=self.max_elements, ef_construction=self.ef_construction, M=self.M)
+            p.add_items(feature)
+            self.reg_matrix.append(copy(p))
+        else:
+            graph_hnws.add_items(feature)
 
     def cos_sim(self, query: np.array) -> np.array:
         pass
