@@ -18,8 +18,8 @@ class SearchSolution(Base):
     search 
     '''
     # @profile
-    def __init__(self, data_file='./data/list_hnsw.bin',
-                 data_url="https://drive.google.com/uc?id=1-04UmEZH_MZu92nNmeiYA4KisnZwoqJr") -> None:
+    def __init__(self, data_file='./data/list_hnsw_5000.bin',
+                 data_url="https://drive.google.com/uc?id=1-0cL9FZVeU-n-liiNu2TMVnEOPYu3W_8") -> None:
         '''
         Creates regestration matrix and passes
         dictionary. Measures baseline speed on
@@ -30,8 +30,8 @@ class SearchSolution(Base):
         self.data_url = data_url
         self.pass_dict = None
         self.dim = 512
-        self.part_step = 10000
-        self.max_elements = 11000
+        self.part_step = 5000
+        self.max_elements = 5100
         self.ef_construction = 200
         self.M = 16
 
@@ -114,8 +114,8 @@ class SearchSolution(Base):
         Return:
             List[Tuple] - indicies of search, similarity
         '''
-        all_distances = []
-        all_labels = []
+        all_distances = np.array([])
+        all_labels = np.array([])
         for graph_idx, graph_hnws in enumerate(self.reg_matrix):
             try:
                 # print(graph_idx, graph_hnws.get_current_count())
@@ -123,13 +123,16 @@ class SearchSolution(Base):
                     continue
                 labels, distances = graph_hnws.knn_query(query, k=5)
                 labels = labels + graph_idx * self.part_step
-                distances = 1 - distances
-                all_labels += labels[0].tolist()
-                all_distances += distances[0].tolist()
+                # distances = 1 - distances
+                # all_labels += labels[0].tolist()
+                # all_distances += distances[0].tolist()
+                all_labels = np.concatenate((all_labels, labels[0]), axis=None)
+                all_distances = np.concatenate((all_distances, distances[0]), axis=None)
             except Exception as e:
                 print(f"graph_idx:{graph_idx}", e)
-
-        result = sorted(list(zip(all_labels, all_distances)), key=lambda x: x[1], reverse=True)
+        all_labels = all_labels.tolist()
+        all_distances = all_distances.tolist()
+        result = list(zip(all_labels, all_distances))
         return result
 
     def insert_base(self, feature: np.array) -> None:
@@ -137,15 +140,19 @@ class SearchSolution(Base):
         ## concationation operation both array should be contingious in
         ## memory. For now, let us suffice the naive implementation of insertion
         # self.reg_matrix = np.concatenate(self.reg_matrix, feature, axis=0)
-        # pass
         graph_hnws = self.reg_matrix[-1]
-        if graph_hnws.get_current_count() >= self.part_step:
-            p = hnswlib.Index(space='cosine', dim=self.dim)  # possible options are l2, cosine or ip
-            p.init_index(max_elements=self.max_elements, ef_construction=self.ef_construction, M=self.M)
-            p.add_items(feature)
-            self.reg_matrix.append(copy(p))
-        else:
+        if self.part_step-graph_hnws.get_current_count() > feature.size[0]:
             graph_hnws.add_items(feature)
+        else:
+            part_0 = self.part_step-graph_hnws.get_current_count()
+            graph_hnws.add_items(feature[0:part_0])
+            for graph_idx, start_idx in enumerate(range(part_0, feature.size[0], self.part_step)):
+                part_feature = feature[start_idx:start_idx + self.part_step]
+                p = hnswlib.Index(space='cosine', dim=self.dim)  # possible options are l2, cosine or ip
+                p.init_index(max_elements=self.max_elements, ef_construction=self.ef_construction, M=self.M)
+                p.add_items(part_feature)
+                self.reg_matrix.append(copy(p))
+                del p
 
     def cos_sim(self, query: np.array) -> np.array:
         pass
