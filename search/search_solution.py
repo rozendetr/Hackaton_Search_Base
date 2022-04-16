@@ -1,6 +1,7 @@
 import pickle, os, time, gdown
 import numpy as np
 import hnswlib
+from copy import copy
 
 from tqdm import tqdm
 from typing import List, Tuple
@@ -46,7 +47,7 @@ class SearchSolution(Base):
         pass_dict : dict -> dict[idx] = [np.array[1, 512]]
         '''
         base_file = './data/train_data.pickle'
-        base_url = 'https://drive.google.com/uc?id=1D_jPx7uIaCJiPb3pkxcrkbeFcEogdg2R'
+        base_url = 'https://drive.google.com/file/d/1NfZwLjy0rQ_vGB_nKXjYIu1vm5tgErEg/view?usp=sharing'
 
         if not os.path.isfile(self.data_file):
             if not os.path.isdir('./data'):
@@ -58,9 +59,9 @@ class SearchSolution(Base):
                 os.mkdir('./data')
             gdown.download(base_url, base_file, quiet=False)
 
-        with open(base_file, 'rb') as f:
-            data = pickle.load(f)
-        self.pass_dict = data['pass']
+        # with open(base_file, 'rb') as f:
+        #     data = pickle.load(f)
+        # self.pass_dict = data['pass']
 
         self.index.load_index(self.data_file)
         self.ids = {}
@@ -96,8 +97,8 @@ class SearchSolution(Base):
                 break
 
         base_speed = T_base / N
-        print(f"Base Line Speed: {base_speed}")
-        print(f"Base Line Accuracy: {C / N * 100}")
+        print(f"Solution Line Speed: {base_speed}")
+        print(f"Solution Line Accuracy: {C / N * 100}")
         with open(base_speed_path, 'wb') as f:
             pickle.dump(base_speed, f)
 
