@@ -1,4 +1,5 @@
 from search.search_baseline import SearchBase
+from search.search_solution import SearchSolution
 
 if __name__ == "__main__":
 
