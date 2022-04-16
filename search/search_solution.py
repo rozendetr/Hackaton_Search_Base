@@ -19,7 +19,7 @@ class SearchSolution(Base):
     '''
     # @profile
     def __init__(self, data_file='./data/list_hnsw.bin',
-                 data_url="https://drive.google.com/u/1/uc?id=1-04UmEZH_MZu92nNmeiYA4KisnZwoqJr&export=download") -> None:
+                 data_url="https://drive.google.com/uc?id=1-04UmEZH_MZu92nNmeiYA4KisnZwoqJr") -> None:
         '''
         Creates regestration matrix and passes
         dictionary. Measures baseline speed on
@@ -28,7 +28,7 @@ class SearchSolution(Base):
         print('reading from Solutions')
         self.data_file = data_file
         self.data_url = data_url
-
+        self.pass_dict = None
         self.dim = 512
         self.part_step = 10000
         self.max_elements = 11000
@@ -36,6 +36,7 @@ class SearchSolution(Base):
         self.M = 16
 
         self.reg_matrix = []
+        self.set_base_from_pickle()
 
     # @profile
     def set_base_from_pickle(self):
@@ -47,7 +48,7 @@ class SearchSolution(Base):
         pass_dict : dict -> dict[idx] = [np.array[1, 512]]
         '''
         base_file = './data/train_data.pickle'
-        base_url = "https://drive.google.com/u/1/uc?id=1NfZwLjy0rQ_vGB_nKXjYIu1vm5tgErEg&export=download"
+        base_url = "https://drive.google.com/uc?id=1NfZwLjy0rQ_vGB_nKXjYIu1vm5tgErEg"
         ""
         if not os.path.isfile(self.data_file):
             if not os.path.isdir('./data'):
@@ -64,7 +65,8 @@ class SearchSolution(Base):
         self.pass_dict = data['pass']
 
         with open(self.data_file, 'rb') as f:
-            self.reg_matrix = pickle.load(f)
+            graphs = pickle.load(f)
+        self.reg_matrix = graphs
 
     # @profile
     def cal_base_speed(self, base_speed_path='./base_speed.pickle') -> float:
@@ -115,16 +117,19 @@ class SearchSolution(Base):
         all_distances = []
         all_labels = []
         for graph_idx, graph_hnws in enumerate(self.reg_matrix):
-            # print(graph_idx, graph_hnws.get_current_count())
-            if graph_hnws.get_current_count() < 5:
-                continue
-            labels, distances = graph_hnws.knn_query(query, k=5)
-            labels = labels + graph_idx * self.part_step
-            distances = 1 - distances
-            all_labels += labels[0].tolist()
-            all_distances += distances[0].tolist()
+            try:
+                # print(graph_idx, graph_hnws.get_current_count())
+                if graph_hnws.get_current_count() < 5:
+                    continue
+                labels, distances = graph_hnws.knn_query(query, k=5)
+                labels = labels + graph_idx * self.part_step
+                distances = 1 - distances
+                all_labels += labels[0].tolist()
+                all_distances += distances[0].tolist()
+            except Exception as e:
+                print(f"graph_idx:{graph_idx}", e)
 
-        result = sorted(list(zip(all_labels, all_distances)), key=lambda x: x[1], reverse=True)[:10]
+        result = sorted(list(zip(all_labels, all_distances)), key=lambda x: x[1], reverse=True)
         return result
 
     def insert_base(self, feature: np.array) -> None:
