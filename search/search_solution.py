@@ -116,20 +116,14 @@ class SearchSolution(Base):
         '''
         all_distances = np.array([])
         all_labels = np.array([])
-        for graph_idx, graph_hnws in enumerate(self.reg_matrix):
-            try:
-                # print(graph_idx, graph_hnws.get_current_count())
-                if graph_hnws.get_current_count() < 5:
-                    continue
-                labels, distances = graph_hnws.knn_query(query, k=5)
-                labels = labels + graph_idx * self.part_step
-                # distances = 1 - distances
-                # all_labels += labels[0].tolist()
-                # all_distances += distances[0].tolist()
-                all_labels = np.concatenate((all_labels, labels[0]), axis=None)
-                all_distances = np.concatenate((all_distances, distances[0]), axis=None)
-            except Exception as e:
-                print(f"graph_idx:{graph_idx}", e)
+        for graph_idx, graph_hnws in enumerate(self.reg_matrix[:-1]):
+            labels, distances = graph_hnws.knn_query(query, k=5)
+            labels = labels + graph_idx * self.part_step
+            # distances = 1 - distances
+            # all_labels += labels[0].tolist()
+            # all_distances += distances[0].tolist()
+            all_labels = np.concatenate((all_labels, labels[0]), axis=None)
+            all_distances = np.concatenate((all_distances, distances[0]), axis=None)
         all_labels = all_labels.tolist()
         all_distances = all_distances.tolist()
         result = list(zip(all_labels, all_distances))
